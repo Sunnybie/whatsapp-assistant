@@ -13,6 +13,7 @@ import {
   extractText,
   isAllowed,
   isDirectChat,
+  normalizeNumber,
   parseAllowList,
   pushCapped,
 } from './lib.js';
@@ -22,6 +23,7 @@ const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const AUTO_REPLY = String(process.env.AUTO_REPLY || 'false').toLowerCase() === 'true';
 const allowList = parseAllowList(process.env.ALLOWLIST);
+const PAIRING_NUMBER = normalizeNumber(process.env.PAIRING_NUMBER || '');
 
 if (AUTO_REPLY && !GEMINI_KEY) {
   console.error('AUTO_REPLY=true but GEMINI_API_KEY is not set. Put it in .env (copy .env.example).');
@@ -69,11 +71,24 @@ async function connect() {
   }
 
   const sock = makeWASocket({ auth: state, version });
+  let pairingRequested = false;
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', ({ connection, lastDisconnect, qr }) => {
+  sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
+      if (PAIRING_NUMBER && !sock.authState.creds.registered && !pairingRequested) {
+        pairingRequested = true;
+        try {
+          const code = await sock.requestPairingCode(PAIRING_NUMBER);
+          console.log('\nEnter this code in WhatsApp on your phone:');
+          console.log('Settings -> Linked devices -> Link a device -> "Link with phone number instead"\n');
+          console.log(`    ${code}\n`);
+          return;
+        } catch (err) {
+          console.error('Pairing code request failed, using the QR code instead:', err.message || err);
+        }
+      }
       console.log('\nScan this QR code with WhatsApp on your phone:');
       console.log('WhatsApp -> Settings -> Linked devices -> Link a device\n');
       qrcode.generate(qr, { small: true });
