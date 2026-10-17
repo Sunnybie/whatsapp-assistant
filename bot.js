@@ -84,13 +84,17 @@ async function connect() {
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr) {
-      if (PAIRING_NUMBER && !sock.authState.creds.registered && !pairingRequested) {
+      if (PAIRING_NUMBER && !sock.authState.creds.registered) {
+        if (pairingRequested) return; // code already printed - ignore QR refreshes
         pairingRequested = true;
         try {
           const code = await sock.requestPairingCode(PAIRING_NUMBER);
-          console.log('\nEnter this code in WhatsApp on your phone (do it now - it only lives a few minutes):');
-          console.log('Settings -> Linked devices -> Link a device -> "Link with phone number instead"\n');
-          console.log(`    ${code}\n`);
+          console.log('\n========================================');
+          console.log('  PAIRING CODE - enter it in WhatsApp NOW');
+          console.log('  Settings -> Linked devices -> Link a device');
+          console.log('  -> "Link with phone number instead"');
+          console.log(`           ${code}`);
+          console.log('========================================\n');
           return;
         } catch (err) {
           console.error('Pairing code request failed, using the QR code instead:', err.message || err);
