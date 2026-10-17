@@ -129,7 +129,9 @@ async function connect() {
         const name = message.pushName || 'unknown';
         const user = chatId.split('@')[0].split(':')[0];
 
-        if (!isAllowed(chatId, allowList)) {
+        // WhatsApp routes many chats via privacy IDs (...@lid); match the allowlist
+        // against the sender's real phone number (senderPn) too, not just the chat id
+        if (!isAllowed(chatId, allowList) && !isAllowed(message.key?.senderPn || '', allowList)) {
           console.log(`[skip] ${name} (${chatId}) is not in ALLOWLIST - add "${user}" to .env to allow them`);
           continue;
         }
