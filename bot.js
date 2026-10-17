@@ -19,6 +19,7 @@ import {
 } from './lib.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const AUTH_DIR = path.join(here, 'auth_state');
 const GEMINI_KEY = process.env.GEMINI_API_KEY || '';
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const AUTO_REPLY = String(process.env.AUTO_REPLY || 'false').toLowerCase() === 'true';
@@ -61,7 +62,13 @@ async function askGemini(hist) {
 }
 
 async function connect() {
-  const { state, saveCreds } = await useMultiFileAuthState(path.join(here, 'auth_state'));
+  let { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+  if (!state.creds.registered) {
+    // a failed/timed-out pairing already saved our number into creds.me; without wiping,
+    // the next attempt logs in as a ghost device and WhatsApp reports "logged out"
+    fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+    ({ state, saveCreds } = await useMultiFileAuthState(AUTH_DIR));
+  }
 
   let version;
   try {
@@ -81,7 +88,7 @@ async function connect() {
         pairingRequested = true;
         try {
           const code = await sock.requestPairingCode(PAIRING_NUMBER);
-          console.log('\nEnter this code in WhatsApp on your phone:');
+          console.log('\nEnter this code in WhatsApp on your phone (do it now - it only lives a few minutes):');
           console.log('Settings -> Linked devices -> Link a device -> "Link with phone number instead"\n');
           console.log(`    ${code}\n`);
           return;
@@ -99,7 +106,7 @@ async function connect() {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
-        console.error('\nThis device was logged out of WhatsApp. Delete the "auth_state" folder, start again, and scan the new QR code.');
+        console.error('\nThis device was unlinked from WhatsApp (you may have removed it in Linked devices). Run "bash run.sh" and link again with the new code.');
         process.exit(1);
       }
       console.log(`Connection closed (${code ?? 'unknown'}). Reconnecting in 3 seconds...`);
