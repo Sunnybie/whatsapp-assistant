@@ -8,6 +8,7 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 import {
+  MAX_HISTORY,
   buildContents,
   describeMedia,
   extractIncomingText,
@@ -29,6 +30,24 @@ const allowList = parseAllowList(process.env.ALLOWLIST);
 const PAIRING_NUMBER = normalizeNumber(process.env.PAIRING_NUMBER || '');
 const SUNNY_JID = PAIRING_NUMBER ? `${PAIRING_NUMBER}@s.whatsapp.net` : '';
 const REPLY_DELAY_MS = Math.max(1, parseInt(process.env.REPLY_DELAY_SECONDS || '10', 10) || 10) * 1000;
+const HISTORY_LIMIT = Math.max(1, parseInt(process.env.HISTORY_LIMIT || String(MAX_HISTORY), 10) || MAX_HISTORY);
+const HISTORY_FILE = path.join(here, 'history.json');
+
+function loadHistory() {
+  try {
+    return new Map(Object.entries(JSON.parse(fs.readFileSync(HISTORY_FILE, 'utf8'))));
+  } catch {
+    return new Map();
+  }
+}
+
+function saveHistory() {
+  try {
+    fs.writeFileSync(HISTORY_FILE, JSON.stringify(Object.fromEntries(history)));
+  } catch (err) {
+    console.error(`[warn] could not save history: ${err.message || err}`);
+  }
+}
 
 if (AUTO_REPLY && !GEMINI_KEY) {
   console.error('AUTO_REPLY=true but GEMINI_API_KEY is not set. Put it in .env (copy .env.example).');
@@ -39,7 +58,7 @@ if (AUTO_REPLY && allowList.size === 0) {
 }
 
 const instructions = fs.readFileSync(path.join(here, 'instructions.md'), 'utf8');
-const history = new Map();
+const history = loadHistory();
 const pending = new Map(); // chatId -> { timer, texts } while a burst is being collected
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -125,12 +144,13 @@ async function connect() {
 
   async function replyToChat(chatId, name, text) {
     const hist = history.get(chatId) ?? [];
-    pushCapped(hist, { role: 'user', text });
+    pushCapped(hist, { role: 'user', text }, HISTORY_LIMIT);
     const reply = await askGemini(hist);
     await sleep(800 + Math.random() * 1700);
     await sock.sendMessage(chatId, { text: reply });
-    pushCapped(hist, { role: 'model', text: reply });
+    pushCapped(hist, { role: 'model', text: reply }, HISTORY_LIMIT);
     history.set(chatId, hist);
+    saveHistory();
     console.log(`[out] ${name}: ${reply}`);
   }
 
