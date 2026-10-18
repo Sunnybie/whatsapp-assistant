@@ -51,6 +51,20 @@ export function extractIncomingText(message) {
   );
 }
 
+export function describeMedia(message) {
+  const msg = message ?? {};
+  if (msg.audioMessage) return msg.audioMessage.ptt ? 'a voice note' : 'an audio file';
+  if (msg.imageMessage) return 'a photo';
+  if (msg.videoMessage) return 'a video';
+  if (msg.documentMessage) return 'a document';
+  if (msg.stickerMessage) return 'a sticker';
+  return null;
+}
+
+export function isUrgent(text) {
+  return /\b(urgent|urgently|emergency|asap)\b/i.test(String(text ?? ''));
+}
+
 export function pushCapped(history, entry, max = MAX_HISTORY) {
   history.push(entry);
   while (history.length > max) history.shift();

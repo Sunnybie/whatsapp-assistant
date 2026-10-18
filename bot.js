@@ -9,10 +9,12 @@ import makeWASocket, {
 import qrcode from 'qrcode-terminal';
 import {
   buildContents,
+  describeMedia,
   extractIncomingText,
   extractText,
   isAllowed,
   isDirectChat,
+  isUrgent,
   normalizeNumber,
   parseAllowList,
   pushCapped,
@@ -25,6 +27,8 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 const AUTO_REPLY = String(process.env.AUTO_REPLY || 'false').toLowerCase() === 'true';
 const allowList = parseAllowList(process.env.ALLOWLIST);
 const PAIRING_NUMBER = normalizeNumber(process.env.PAIRING_NUMBER || '');
+const SUNNY_JID = PAIRING_NUMBER ? `${PAIRING_NUMBER}@s.whatsapp.net` : '';
+const REPLY_DELAY_MS = Math.max(1, parseInt(process.env.REPLY_DELAY_SECONDS || '10', 10) || 10) * 1000;
 
 if (AUTO_REPLY && !GEMINI_KEY) {
   console.error('AUTO_REPLY=true but GEMINI_API_KEY is not set. Put it in .env (copy .env.example).');
@@ -36,6 +40,7 @@ if (AUTO_REPLY && allowList.size === 0) {
 
 const instructions = fs.readFileSync(path.join(here, 'instructions.md'), 'utf8');
 const history = new Map();
+const pending = new Map(); // chatId -> { timer, texts } while a burst is being collected
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -118,6 +123,17 @@ async function connect() {
     }
   });
 
+  async function replyToChat(chatId, name, text) {
+    const hist = history.get(chatId) ?? [];
+    pushCapped(hist, { role: 'user', text });
+    const reply = await askGemini(hist);
+    await sleep(800 + Math.random() * 1700);
+    await sock.sendMessage(chatId, { text: reply });
+    pushCapped(hist, { role: 'model', text: reply });
+    history.set(chatId, hist);
+    console.log(`[out] ${name}: ${reply}`);
+  }
+
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     if (type !== 'notify') return;
     for (const message of messages) {
@@ -136,24 +152,38 @@ async function connect() {
           continue;
         }
 
-        const text = extractIncomingText(message.message);
+        let text = extractIncomingText(message.message);
         if (!text) {
-          console.log(`[skip] ${name}: message has no text (voice notes and media without captions are not supported yet)`);
-          continue;
+          const media = describeMedia(message.message);
+          if (!media) {
+            console.log(`[skip] ${name}: unsupported message type`);
+            continue;
+          }
+          text = `[${name} sent ${media}]`;
+          console.log(`[in] ${name}: ${media} (no caption)`);
+        } else {
+          console.log(`[in] ${name}: ${text}`);
         }
 
-        console.log(`[in] ${name}: ${text}`);
-        const hist = history.get(chatId) ?? [];
-        pushCapped(hist, { role: 'user', text });
-        history.set(chatId, hist);
+        // urgent messages are copied to Sunny's own chat so they reach him even while away
+        if (AUTO_REPLY && SUNNY_JID && chatId !== SUNNY_JID && isUrgent(text)) {
+          await sock.sendMessage(SUNNY_JID, { text: `Urgent message from ${name} (${user}):\n\n${text}` });
+          console.log(`[alert] urgent message from ${name} forwarded to Sunny`);
+        }
 
         if (!AUTO_REPLY) continue;
 
-        const reply = await askGemini(hist);
-        await sleep(800 + Math.random() * 1700);
-        await sock.sendMessage(chatId, { text: reply });
-        pushCapped(hist, { role: 'model', text: reply });
-        console.log(`[out] ${name}: ${reply}`);
+        // collect message bursts and answer once, REPLY_DELAY_MS after the last one
+        const entry = pending.get(chatId) ?? { timer: null, texts: [] };
+        entry.texts.push(text);
+        clearTimeout(entry.timer);
+        entry.timer = setTimeout(() => {
+          pending.delete(chatId);
+          const combined = entry.texts.join('\n');
+          replyToChat(chatId, name, combined).catch((err) =>
+            console.error(`[error] ${chatId}: ${err.message || err}`));
+        }, REPLY_DELAY_MS);
+        pending.set(chatId, entry);
       } catch (err) {
         console.error(`[error] ${message.key?.remoteJid ?? 'unknown'}: ${err.message || err}`);
       }

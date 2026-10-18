@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-10-18 — Message handling improvements
+
+- **Voice notes and media no longer get silence.** A voice note, photo,
+  video, document, or sticker without a caption now gets a normal assistant
+  reply ("X sent a voice note…") so the sender knows it was seen.
+- **Message bursts get one reply, not five.** When someone sends several
+  messages in a row, the bot waits 10 seconds after the last one
+  (adjustable with `REPLY_DELAY_SECONDS` in `.env`) and answers everything
+  together in one message.
+- **Urgent messages reach Sunny directly.** Messages containing
+  "urgent", "emergency", or "asap" are copied to Sunny's own WhatsApp chat
+  so he sees them even while away.
+
 ## 2026-10-17 — Phone setup corrections
 
 All fixes from getting the assistant running on the Android phone (Termux):

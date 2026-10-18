@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import {
   MAX_HISTORY,
   buildContents,
+  describeMedia,
   extractIncomingText,
   extractText,
   isAllowed,
   isDirectChat,
+  isUrgent,
   normalizeNumber,
   parseAllowList,
   pushCapped,
@@ -47,6 +49,20 @@ assert.equal(extractIncomingText({ ephemeralMessage: { message: { conversation: 
 assert.equal(extractIncomingText({ viewOnceMessageV2: { message: { extendedTextMessage: { text: 'once' } } } }), 'once');
 assert.equal(extractIncomingText({ imageMessage: {} }), null);
 assert.equal(extractIncomingText(null), null);
+
+assert.equal(describeMedia({ imageMessage: {} }), 'a photo');
+assert.equal(describeMedia({ videoMessage: {} }), 'a video');
+assert.equal(describeMedia({ audioMessage: { ptt: true } }), 'a voice note');
+assert.equal(describeMedia({ audioMessage: { ptt: false } }), 'an audio file');
+assert.equal(describeMedia({ documentMessage: {} }), 'a document');
+assert.equal(describeMedia({ conversation: 'hi' }), null);
+assert.equal(describeMedia(null), null);
+
+assert.equal(isUrgent('This is urgent please'), true);
+assert.equal(isUrgent('URGENT!!!'), true);
+assert.equal(isUrgent('it is an emergency'), true);
+assert.equal(isUrgent('reply asap'), true);
+assert.equal(isUrgent('hello, how are you'), false);
 
 const hist = [];
 for (let i = 0; i < 20; i++) pushCapped(hist, { role: 'user', text: `m${i}` });
