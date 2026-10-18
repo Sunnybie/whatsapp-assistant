@@ -2,6 +2,10 @@
 
 ## 2026-10-18 — Message handling improvements
 
+- **Longer, lasting memory.** The assistant now remembers more of each
+  conversation (set `HISTORY_LIMIT` in `.env`, default 12 messages per chat)
+  and the memory is saved to `history.json`, so it survives restarts —
+  no more starting every chat from zero after a reboot.
 - **Voice notes and media no longer get silence.** A voice note, photo,
   video, document, or sticker without a caption now gets a normal assistant
   reply ("X sent a voice note…") so the sender knows it was seen.
