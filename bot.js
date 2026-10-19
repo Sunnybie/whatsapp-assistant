@@ -134,6 +134,9 @@ async function connect() {
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
+        // the server killed this session; without wiping, the saved creds still say
+        // "registered" and every restart retries the dead session instead of pairing fresh
+        fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         console.error('\nThis device was unlinked from WhatsApp (you may have removed it in Linked devices). Run "bash run.sh" and link again with the new code.');
         process.exit(1);
       }
