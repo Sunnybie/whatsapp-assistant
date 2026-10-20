@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import makeWASocket, {
   DisconnectReason,
@@ -188,10 +189,16 @@ async function connect() {
           console.log(`[in] ${name}: ${text}`);
         }
 
-        // urgent messages are copied to Sunny's own chat so they reach him even while away
-        if (AUTO_REPLY && SUNNY_JID && chatId !== SUNNY_JID && isUrgent(text)) {
-          await sock.sendMessage(SUNNY_JID, { text: `Urgent message from ${name} (${user}):\n\n${text}` });
-          console.log(`[alert] urgent message from ${name} forwarded to Sunny`);
+        // urgent messages reach Sunny directly: local notification + flashlight on the
+        // phone running the bot (no WhatsApp decryption involved), plus a copy to his
+        // own chat as a record - that copy can occasionally stick as "Waiting for this
+        // message" on the phone, which is why the local alert is the primary channel
+        if (AUTO_REPLY && chatId !== SUNNY_JID && isUrgent(text)) {
+          if (SUNNY_JID) {
+            await sock.sendMessage(SUNNY_JID, { text: `Urgent message from ${name} (${user}):\n\n${text}` });
+          }
+          spawn('bash', [path.join(here, 'flash.sh'), name, text], { stdio: 'inherit' }).unref();
+          console.log(`[alert] urgent message from ${name} - notification sent, phone flashing (press Enter in Termux to stop)`);
         }
 
         if (!AUTO_REPLY) continue;

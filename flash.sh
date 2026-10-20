@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# Urgent alert, called by bot.js with: bash flash.sh "<sender name>" "<message text>"
+# 1) pops a phone notification right away (works even if WhatsApp can't decrypt
+#    the copy the bot sends to your own chat)
+# 2) then flashes the torch and vibrates until the user presses Enter (~60s cap)
+# Requires the Termux:API app (install from F-Droid) and: pkg install termux-api
+NAME="${1:-someone}"
+TEXT="${2:-urgent message received}"
+
+if command -v termux-notification >/dev/null 2>&1; then
+  termux-notification -t "URGENT WhatsApp from $NAME" -c "$TEXT"
+fi
+
+command -v termux-torch >/dev/null 2>&1 || exit 0
+
+trap 'termux-torch off >/dev/null 2>&1; exit 0' INT TERM EXIT
+
+echo ""
+echo "!!! URGENT MESSAGE from $NAME - press Enter here to stop the flashing !!!"
+
+END=$((SECONDS + 60))
+while [ "$SECONDS" -lt "$END" ]; do
+  termux-torch on >/dev/null 2>&1
+  termux-vibrate -d 200 >/dev/null 2>&1 || true
+  read -t 0.3 -n 1 && break
+  termux-torch off >/dev/null 2>&1
+  read -t 0.3 -n 1 && break
+done
