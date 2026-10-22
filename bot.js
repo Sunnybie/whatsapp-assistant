@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import makeWASocket, {
   DisconnectReason,
+  downloadMediaMessage,
   fetchLatestBaileysVersion,
   useMultiFileAuthState,
 } from '@whiskeysockets/baileys';
@@ -64,6 +65,13 @@ const pending = new Map(); // chatId -> { timer, texts } while a burst is being 
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+// downloadMediaMessage wants a pino-like logger; this stub is enough
+const silentLog = {
+  level: 'silent',
+  trace() {}, debug() {}, info() {}, warn() {}, error() {}, fatal() {},
+  child() { return this; },
+};
+
 async function askGemini(hist) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
   const res = await fetch(url, {
@@ -84,6 +92,49 @@ async function askGemini(hist) {
   const text = extractText(await res.json());
   if (!text) throw new Error('Gemini returned no text (blocked or empty).');
   return text;
+}
+
+async function askGeminiMedia(prompt, buf, mime) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }, { inlineData: { mimeType: mime, data: Buffer.from(buf).toString('base64') } }] }],
+      generationConfig: {
+        maxOutputTokens: 500,
+        thinkingConfig: { includeThoughts: false, thinkingLevel: 'minimal' },
+      },
+    }),
+  });
+  if (!res.ok) {
+    throw new Error(`Gemini API ${res.status}: ${(await res.text()).slice(0, 300)}`);
+  }
+  return extractText(await res.json());
+}
+
+// voice notes -> transcript, photos -> short description; null when it can't be done
+async function understandMedia(message, name) {
+  const msg = message.message ?? {};
+  let prompt = null;
+  let mime = null;
+  if (msg.audioMessage) {
+    prompt = 'Transcribe this voice message word for word. Output only the transcript text - no commentary, no quotes.';
+    mime = msg.audioMessage.mimetype || 'audio/ogg';
+  } else if (msg.imageMessage) {
+    prompt = 'Describe this image in one or two short sentences, as if telling someone what they just received.';
+    mime = msg.imageMessage.mimetype || 'image/jpeg';
+  }
+  if (!prompt || !GEMINI_KEY) return null;
+  try {
+    const buf = await downloadMediaMessage(message, 'buffer', {}, { logger: silentLog });
+    const reply = await askGeminiMedia(prompt, buf, mime);
+    if (!reply) return null;
+    return msg.audioMessage ? `[voice note from ${name}]: ${reply}` : `[photo from ${name}]: ${reply}`;
+  } catch (err) {
+    console.log(`[warn] could not understand media from ${name}: ${err.message || err}`);
+    return null;
+  }
 }
 
 async function connect() {
@@ -177,6 +228,9 @@ async function connect() {
         }
 
         let text = extractIncomingText(message.message);
+        if (!text) {
+          text = await understandMedia(message, name);
+        }
         if (!text) {
           const media = describeMedia(message.message);
           if (!media) {

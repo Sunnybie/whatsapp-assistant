@@ -25,6 +25,14 @@ fi
 chmod +x run.sh allow.sh reply.sh update.sh flash.sh setup-termux.sh 2>/dev/null || true
 npm install --omit=optional --no-audit --no-fund
 
+# start the bot automatically when the phone boots (needs the Termux:Boot app from F-Droid)
+mkdir -p "$HOME/.termux/boot"
+cat > "$HOME/.termux/boot/start-whatsapp-assistant.sh" <<'EOF'
+#!/usr/bin/env bash
+cd "$HOME/whatsapp-assistant" 2>/dev/null && bash run.sh
+EOF
+chmod +x "$HOME/.termux/boot/start-whatsapp-assistant.sh" 2>/dev/null || true
+
 if [ ! -f .env ]; then
   cp .env.example .env
   echo ""
@@ -69,6 +77,9 @@ echo "  (Android Settings -> Apps -> Termux -> Battery)"
 echo ""
 echo "  Flash alerts: install the Termux:API app from F-Droid"
 echo "  (needed for the urgent-message flashlight strobe)"
+echo ""
+echo "  Auto-start on phone restart: install the Termux:Boot app"
+echo "  from F-Droid (and keep Termux + Termux:API battery Unrestricted)"
 echo "=========================================="
 
 echo ""

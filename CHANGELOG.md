@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-10-22 — Voice notes, photos, and self-healing
+
+- **Voice notes are transcribed.** The bot downloads incoming voice notes,
+  sends them to Gemini, and answers the actual spoken content (verified
+  end-to-end with a test recording). If transcription fails, it falls back
+  to the old "X sent a voice note" acknowledgment.
+- **Photos get a short description**, same mechanism, so the assistant can
+  react to screenshots and images too.
+- **The bot restarts itself.** `run.sh` re-launches the bot if it stops on
+  its own (crash or network blip); CTRL then C still stops it completely.
+- **Start on phone boot.** The setup script installs a Termux:Boot entry so
+  the bot starts after a phone restart; install the Termux:Boot app from
+  F-Droid to enable it (give it the same Unrestricted-battery setting).
+
 ## 2026-10-19 — Easier installing and operating
 
 - **The setup script now checks your answers.** It rejects Gemini keys that
