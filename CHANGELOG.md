@@ -29,14 +29,15 @@
   - `bash update.sh` - pull the latest code and restart in one step
 - **Urgent messages now alert the phone directly.** When a message
   containing "urgent", "emergency", or "asap" arrives, the phone pops a
-  notification and the flashlight comes on + vibrates every 2 seconds until
-  you press Enter in Termux (with a ~10 minute safety stop). The local alert
-  is the reliable channel: the copy sent to your own WhatsApp chat can
+  notification (with a vibration pattern) and blinks the flashlight slowly
+  until you press Enter in Termux (with a ~10 minute safety stop). The local
+  alert is the reliable channel: the copy sent to your own WhatsApp chat can
   sometimes stick as "Waiting for this message" on the phone (a WhatsApp
-  key-sync quirk linked devices can't control), but the notification and
-  light don't depend on WhatsApp at all. The light is steady rather than a
-  strobe: rapid toggling raced the camera manager on some phones and the
-  torch died after the first flash. Needs the Termux:API app from F-Droid
+  key-sync quirk linked devices can't control), but the notification doesn't
+  depend on WhatsApp at all. Torch reality on some phones (Tecno/Infinix):
+  the camera manager force-releases the torch after ~3 seconds, so it can
+  blink but never stay lit - the blink is paced at 2.5s and the vibration
+  pattern carries the alert regardless. Needs the Termux:API app from F-Droid
   set to **Unrestricted battery** (same as Termux, or Android kills the
   light); the setup script installs the `termux-api` package automatically.
 - **Relinking is automatic now:** if WhatsApp unlinks the bot, it wipes its

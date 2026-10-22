@@ -11,7 +11,7 @@ Built with [Baileys](https://github.com/WhiskeySockets/Baileys) (WhatsApp Web pr
 - The bot sends the message (plus the last few messages of that chat) to Google Gemini, which writes a reply using the rules in `instructions.md`.
 - The bot sends that reply from your number, clearly written as "your assistant", and logs everything to the terminal.
 - Voice notes are transcribed and answered, and photos get a short description - the sender knows they were heard/seen. Other media (video, documents, stickers) get an acknowledgment only.
-- Messages containing words like "urgent" or "emergency" trigger a phone notification and turn the flashlight on (press Enter in Termux to turn it off), and are copied to your own chat as a record. Note: the self-chat copy can occasionally show "Waiting for this message" on the phone - a WhatsApp quirk - but the notification and flashlight always fire.
+- Messages containing words like "urgent" or "emergency" trigger a phone notification (with vibration) and blink the flashlight (press Enter in Termux to stop), and are copied to your own chat as a record. Note: the self-chat copy can occasionally show "Waiting for this message" on the phone - a WhatsApp quirk - but the notification always fires; on some phones the torch can only blink briefly, never stay on.
 - Everything else - groups, unknown contacts, unsupported message types - is ignored or just logged.
 
 ## Requirements
