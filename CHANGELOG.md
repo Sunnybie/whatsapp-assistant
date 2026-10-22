@@ -13,12 +13,13 @@
 - **Urgent messages now alert the phone directly.** When a message
   containing "urgent", "emergency", or "asap" arrives, the phone pops a
   notification and the flashlight strobes + vibrates until you press Enter
-  in Termux (or ~60 seconds pass). The local alert is the reliable channel:
-  the copy sent to your own WhatsApp chat can sometimes stick as "Waiting
-  for this message" on the phone (a WhatsApp key-sync quirk linked devices
-  can't control), but the notification and strobe don't depend on WhatsApp
-  at all. Needs the Termux:API app from F-Droid; the setup script installs
-  the `termux-api` package automatically.
+  in Termux (with a ~10 minute safety stop). The local alert is the reliable
+  channel: the copy sent to your own WhatsApp chat can sometimes stick as
+  "Waiting for this message" on the phone (a WhatsApp key-sync quirk linked
+  devices can't control), but the notification and strobe don't depend on
+  WhatsApp at all. Needs the Termux:API app from F-Droid set to
+  **Unrestricted battery** (same as Termux, or Android kills the strobe);
+  the setup script installs the `termux-api` package automatically.
 - **Relinking is automatic now:** if WhatsApp unlinks the bot, it wipes its
   old login so the next start offers a fresh pairing code instead of
   looping "logged out".
