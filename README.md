@@ -11,7 +11,7 @@ Built with [Baileys](https://github.com/WhiskeySockets/Baileys) (WhatsApp Web pr
 - The bot sends the message (plus the last few messages of that chat) to Google Gemini, which writes a reply using the rules in `instructions.md`.
 - The bot sends that reply from your number, clearly written as "your assistant", and logs everything to the terminal.
 - Voice notes are transcribed and answered, and photos get a short description - the sender knows they were heard/seen. Other media (video, documents, stickers) get an acknowledgment only.
-- Messages containing words like "urgent" or "emergency" trigger a phone notification and flashlight strobe (press Enter in Termux to stop), and are copied to your own chat as a record. Note: the self-chat copy can occasionally show "Waiting for this message" on the phone - a WhatsApp quirk - but the notification and flashlight always fire.
+- Messages containing words like "urgent" or "emergency" trigger a phone notification and turn the flashlight on (press Enter in Termux to turn it off), and are copied to your own chat as a record. Note: the self-chat copy can occasionally show "Waiting for this message" on the phone - a WhatsApp quirk - but the notification and flashlight always fire.
 - Everything else - groups, unknown contacts, unsupported message types - is ignored or just logged.
 
 ## Requirements
@@ -70,7 +70,7 @@ Keeping it alive:
 - To have the bot start itself after a phone restart, install the **Termux:Boot** app from F-Droid (same source as Termux): https://f-droid.org/packages/com.termux.boot - the setup script already installed the boot entry; the boot script just runs `bash run.sh`.
 - If the phone restarts and you don't use Termux:Boot, open Termux and run: `cd ~/whatsapp-assistant && bash run.sh`
 - The 8-digit code expires after a few minutes. If you were too slow, stop the bot (Ctrl+C) and start it again for a fresh code.
-- For the urgent-message flashlight strobe, also install the **Termux:API** app from F-Droid (same source as Termux): https://f-droid.org/packages/com.termux.api
+- For the urgent-message flashlight alert, also install the **Termux:API** app from F-Droid (same source as Termux): https://f-droid.org/packages/com.termux.api
 
 Phone helpers:
 
