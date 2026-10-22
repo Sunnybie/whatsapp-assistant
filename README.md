@@ -12,6 +12,9 @@ Built with [Baileys](https://github.com/WhiskeySockets/Baileys) (WhatsApp Web pr
 - The bot sends that reply from your number, clearly written as "your assistant", and logs everything to the terminal.
 - Voice notes are transcribed and answered, and photos get a short description - the sender knows they were heard/seen. Other media (video, documents, stickers) get an acknowledgment only.
 - Messages containing words like "urgent" or "emergency" trigger a phone notification (with vibration) and blink the flashlight (press Enter in Termux to stop), and are copied to your own chat as a record. Note: the self-chat copy can occasionally show "Waiting for this message" on the phone - a WhatsApp quirk - but the notification always fires; on some phones the torch can only blink briefly, never stay on.
+- Between 23:00 and 07:00 (configurable with `QUIET_HOURS`) the assistant stays silent: messages are saved to memory and answered when the person writes again after the window ends. Urgent alerts still fire at any hour.
+- A first-time stranger (anyone not listed explicitly in `ALLOWLIST`, only possible when `ALLOWLIST=*`) gets a receptionist reply - the assistant asks who they are and what it's about, so you get a clean summary instead of a bare unknown number.
+- Strangers are also capped at `MAX_REPLIES_PER_CHAT_PER_DAY` (default 10) assistant replies per day, so a junk number can't burn your free Gemini quota. People listed explicitly in `ALLOWLIST` are never capped or intaked.
 - Everything else - groups, unknown contacts, unsupported message types - is ignored or just logged.
 
 ## Requirements

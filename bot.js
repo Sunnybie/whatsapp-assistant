@@ -17,9 +17,12 @@ import {
   extractText,
   isAllowed,
   isDirectChat,
+  isExplicitlyAllowed,
+  isQuietTime,
   isUrgent,
   normalizeNumber,
   parseAllowList,
+  parseQuietHours,
   pushCapped,
 } from './lib.js';
 
@@ -34,6 +37,9 @@ const SUNNY_JID = PAIRING_NUMBER ? `${PAIRING_NUMBER}@s.whatsapp.net` : '';
 const REPLY_DELAY_MS = Math.max(1, parseInt(process.env.REPLY_DELAY_SECONDS || '10', 10) || 10) * 1000;
 const HISTORY_LIMIT = Math.max(1, parseInt(process.env.HISTORY_LIMIT || String(MAX_HISTORY), 10) || MAX_HISTORY);
 const HISTORY_FILE = path.join(here, 'history.json');
+const QUIET_HOURS = parseQuietHours(process.env.QUIET_HOURS ?? '23-7'); // default overnight silence; set QUIET_HOURS= (empty) to disable
+const REPLY_CAP = Math.max(0, parseInt(process.env.MAX_REPLIES_PER_CHAT_PER_DAY || '10', 10) || 0); // per stranger per day; 0 = no cap
+const REPLY_COUNTS_FILE = path.join(here, 'reply-counts.json');
 
 function loadHistory() {
   try {
@@ -51,6 +57,27 @@ function saveHistory() {
   }
 }
 
+function loadReplyCounts() {
+  try {
+    return JSON.parse(fs.readFileSync(REPLY_COUNTS_FILE, 'utf8'));
+  } catch {
+    return {};
+  }
+}
+
+function saveReplyCounts() {
+  try {
+    fs.writeFileSync(REPLY_COUNTS_FILE, JSON.stringify(replyCounts));
+  } catch (err) {
+    console.error(`[warn] could not save reply counts: ${err.message || err}`);
+  }
+}
+
+function todayKey() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 if (AUTO_REPLY && !GEMINI_KEY) {
   console.error('AUTO_REPLY=true but GEMINI_API_KEY is not set. Put it in .env (copy .env.example).');
   process.exit(1);
@@ -61,7 +88,12 @@ if (AUTO_REPLY && allowList.size === 0) {
 
 const instructions = fs.readFileSync(path.join(here, 'instructions.md'), 'utf8');
 const history = loadHistory();
+const replyCounts = loadReplyCounts(); // chatId -> { date: 'YYYY-MM-DD', count }
 const pending = new Map(); // chatId -> { timer, texts } while a burst is being collected
+
+const INTAKE_INSTRUCTION = 'New contact protocol: this sender is a first-time contact whose number is not saved with us. '
+  + 'Politely ask for their name and what their message is about, and say you will pass it on to Sunny. '
+  + 'Do not answer their request beyond acknowledging it. Keep it to 2-3 short sentences.';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -72,13 +104,14 @@ const silentLog = {
   child() { return this; },
 };
 
-async function askGemini(hist) {
+async function askGemini(hist, extraInstruction) {
+  const systemText = extraInstruction ? `${instructions}\n\n${extraInstruction}` : instructions;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: instructions }] },
+      systemInstruction: { parts: [{ text: systemText }] },
       contents: buildContents(hist),
       generationConfig: {
         maxOutputTokens: 500,
@@ -181,7 +214,8 @@ async function connect() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === 'open') {
-      console.log(`\nConnected. Waiting for messages. Mode: ${AUTO_REPLY ? 'AUTO-REPLY ON' : 'watch only (nothing will be sent)'}.`);
+      const quiet = AUTO_REPLY && QUIET_HOURS ? `, quiet hours ${QUIET_HOURS.start}:00-${QUIET_HOURS.end}:00` : '';
+      console.log(`\nConnected. Waiting for messages. Mode: ${AUTO_REPLY ? 'AUTO-REPLY ON' : 'watch only (nothing will be sent)'}${quiet}.`);
     }
     if (connection === 'close') {
       const code = lastDisconnect?.error?.output?.statusCode;
@@ -197,12 +231,31 @@ async function connect() {
     }
   });
 
-  async function replyToChat(chatId, name, text) {
+  async function replyToChat(chatId, name, text, isStranger) {
+    if (isStranger && REPLY_CAP > 0) {
+      const key = todayKey();
+      const rec = replyCounts[chatId];
+      const used = rec && rec.date === key ? rec.count : 0;
+      if (used >= REPLY_CAP) {
+        console.log(`[skip] ${name}: daily reply cap reached for strangers (${used}/${REPLY_CAP}) - no more replies to this number today`);
+        return;
+      }
+    }
+
     const hist = history.get(chatId) ?? [];
     pushCapped(hist, { role: 'user', text }, HISTORY_LIMIT);
-    const reply = await askGemini(hist);
+    const firstContact = isStranger && !hist.some((e) => e.role === 'model');
+    const reply = await askGemini(hist, firstContact ? INTAKE_INSTRUCTION : undefined);
     await sleep(800 + Math.random() * 1700);
     await sock.sendMessage(chatId, { text: reply });
+
+    if (isStranger && REPLY_CAP > 0) {
+      const key = todayKey();
+      const rec = replyCounts[chatId];
+      replyCounts[chatId] = { date: key, count: rec && rec.date === key ? rec.count + 1 : 1 };
+      saveReplyCounts();
+    }
+
     pushCapped(hist, { role: 'model', text: reply }, HISTORY_LIMIT);
     history.set(chatId, hist);
     saveHistory();
@@ -226,6 +279,11 @@ async function connect() {
           console.log(`[skip] ${name} (${chatId}) is not in ALLOWLIST - add "${user}" to .env to allow them`);
           continue;
         }
+        // with ALLOWLIST=* everyone is allowed; a "stranger" is anyone not listed
+        // explicitly - strangers get the daily reply cap and the intake treatment
+        const isStranger = allowList.has('*')
+          && !isExplicitlyAllowed(chatId, allowList)
+          && !isExplicitlyAllowed(message.key?.senderPn || '', allowList);
 
         let text = extractIncomingText(message.message);
         if (!text) {
@@ -257,6 +315,17 @@ async function connect() {
 
         if (!AUTO_REPLY) continue;
 
+        // quiet hours: save the message to memory so the next reply has context,
+        // but stay silent - urgent alerts above still fire at any hour
+        if (isQuietTime(QUIET_HOURS)) {
+          const hist = history.get(chatId) ?? [];
+          pushCapped(hist, { role: 'user', text }, HISTORY_LIMIT);
+          history.set(chatId, hist);
+          saveHistory();
+          console.log(`[skip] quiet hours (${QUIET_HOURS.start}:00-${QUIET_HOURS.end}:00) - saved for later, no reply sent`);
+          continue;
+        }
+
         // collect message bursts and answer once, REPLY_DELAY_MS after the last one
         const entry = pending.get(chatId) ?? { timer: null, texts: [] };
         entry.texts.push(text);
@@ -264,7 +333,7 @@ async function connect() {
         entry.timer = setTimeout(() => {
           pending.delete(chatId);
           const combined = entry.texts.join('\n');
-          replyToChat(chatId, name, combined).catch((err) =>
+          replyToChat(chatId, name, combined, isStranger).catch((err) =>
             console.error(`[error] ${chatId}: ${err.message || err}`));
         }, REPLY_DELAY_MS);
         pending.set(chatId, entry);

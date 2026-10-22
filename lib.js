@@ -25,10 +25,34 @@ export function parseAllowList(raw) {
 export function isAllowed(jid, allowList) {
   if (!allowList || allowList.size === 0) return false;
   if (allowList.has('*')) return true;
+  return isExplicitlyAllowed(jid, allowList);
+}
+
+// same matching as isAllowed but never matches the '*' wildcard,
+// so the bot can tell "explicitly trusted contact" from "allowed because *"
+export function isExplicitlyAllowed(jid, allowList) {
+  if (!allowList || allowList.size === 0) return false;
   const user = String(jid ?? '').split('@')[0].split(':')[0];
   if (allowList.has(user)) return true;
   const digits = normalizeNumber(user);
   return digits !== '' && allowList.has(digits);
+}
+
+// "23-7" -> { start: 23, end: 7 }; null when unset or malformed (start === end means disabled)
+export function parseQuietHours(raw) {
+  const m = String(raw ?? '').trim().match(/^(\d{1,2})\s*-\s*(\d{1,2})$/);
+  if (!m) return null;
+  const start = parseInt(m[1], 10);
+  const end = parseInt(m[2], 10);
+  if (start < 0 || start > 23 || end < 0 || end > 23 || start === end) return null;
+  return { start, end };
+}
+
+export function isQuietTime(qh, date = new Date()) {
+  if (!qh) return false;
+  const h = date.getHours();
+  if (qh.start < qh.end) return h >= qh.start && h < qh.end;
+  return h >= qh.start || h < qh.end; // overnight window like 23-7
 }
 
 export function isDirectChat(jid) {

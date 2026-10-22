@@ -7,9 +7,12 @@ import {
   extractText,
   isAllowed,
   isDirectChat,
+  isExplicitlyAllowed,
+  isQuietTime,
   isUrgent,
   normalizeNumber,
   parseAllowList,
+  parseQuietHours,
   pushCapped,
 } from './lib.js';
 
@@ -34,6 +37,34 @@ assert.equal(isAllowed('2348099999999@s.whatsapp.net', allow), false);
 assert.equal(isAllowed('2348012345678@s.whatsapp.net', new Set()), false);
 assert.equal(isAllowed('999@s.whatsapp.net', new Set(['*'])), true);
 assert.equal(isAllowed('123@lid', parseAllowList('123@lid')), true);
+
+assert.equal(isExplicitlyAllowed('2348012345678@s.whatsapp.net', parseAllowList('2348012345678,*')), true);
+assert.equal(isExplicitlyAllowed('999@s.whatsapp.net', new Set(['*'])), false);
+assert.equal(isExplicitlyAllowed('999@s.whatsapp.net', new Set()), false);
+assert.equal(isExplicitlyAllowed('123@lid', parseAllowList('123,*')), true);
+
+assert.deepEqual(parseQuietHours('23-7'), { start: 23, end: 7 });
+assert.deepEqual(parseQuietHours(' 9 - 17 '), { start: 9, end: 17 });
+assert.equal(parseQuietHours(''), null);
+assert.equal(parseQuietHours(undefined), null);
+assert.equal(parseQuietHours('7-7'), null);
+assert.equal(parseQuietHours('25-3'), null);
+assert.equal(parseQuietHours('nine-five'), null);
+
+const atHour = (h) => new Date(2026, 9, 22, h, 30);
+assert.equal(isQuietTime(null, atHour(2)), false);
+const overnight = parseQuietHours('23-7');
+assert.equal(isQuietTime(overnight, atHour(23)), true);
+assert.equal(isQuietTime(overnight, atHour(0)), true);
+assert.equal(isQuietTime(overnight, atHour(6)), true);
+assert.equal(isQuietTime(overnight, atHour(7)), false);
+assert.equal(isQuietTime(overnight, atHour(12)), false);
+assert.equal(isQuietTime(overnight, atHour(22)), false);
+const daytime = parseQuietHours('9-17');
+assert.equal(isQuietTime(daytime, atHour(9)), true);
+assert.equal(isQuietTime(daytime, atHour(16)), true);
+assert.equal(isQuietTime(daytime, atHour(17)), false);
+assert.equal(isQuietTime(daytime, atHour(8)), false);
 
 assert.equal(isDirectChat('2348012345678@s.whatsapp.net'), true);
 assert.equal(isDirectChat('123@lid'), true);
