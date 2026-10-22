@@ -22,7 +22,8 @@ else
   cd whatsapp-assistant
 fi
 
-chmod +x run.sh allow.sh reply.sh update.sh flash.sh setup-termux.sh 2>/dev/null || true
+# scripts are always run via "bash script.sh", so no chmod needed (chmod would
+# dirty the git tree and block later updates)
 npm install --omit=optional --no-audit --no-fund
 
 # start the bot automatically when the phone boots (needs the Termux:Boot app from F-Droid)

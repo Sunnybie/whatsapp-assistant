@@ -13,6 +13,9 @@
 - **Start on phone boot.** The setup script installs a Termux:Boot entry so
   the bot starts after a phone restart; install the Termux:Boot app from
   F-Droid to enable it (give it the same Unrestricted-battery setting).
+- **Updates unblock themselves.** If a leftover file touch (like an old
+  `chmod`) blocks `git pull`, `update.sh` now resets the scripts and retries
+  on its own, and the installer no longer chmods files it installs.
 
 ## 2026-10-19 — Easier installing and operating
 
