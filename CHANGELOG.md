@@ -2,16 +2,16 @@
 
 ## 2026-10-22 — Voice notes, photos, self-healing, and stranger handling
 
+- **Quiet hours (optional, off by default).** Set `QUIET_HOURS` (e.g. `23-7`,
+  overnight ranges work) and the assistant saves incoming messages to memory
+  but stays silent during the window; the next message the person sends after
+  the window ends gets a normal reply with full context. Urgent alerts
+  (notification + flashlight + self-chat copy) still fire at any hour.
 - **Strangers get a receptionist intake.** With `ALLOWLIST=*`, a number that
   is not listed explicitly gets a first-contact reply that asks who they are
   and what the message is about, so Sunny gets a clean summary instead of a
   bare unknown-number thread. Explicitly allowlisted contacts are never
   intaked.
-- **Quiet hours.** Overnight (default `23-7`, set `QUIET_HOURS` to change,
-  empty to disable) the assistant saves incoming messages to memory but stays
-  silent; the next message the person sends after the window ends gets a
-  normal reply with full context. Urgent alerts (notification + flashlight +
-  self-chat copy) still fire at any hour.
 - **Stranger reply cap.** With `ALLOWLIST=*`, each unknown number can receive
   at most `MAX_REPLIES_PER_CHAT_PER_DAY` (default 10) assistant replies per
   day, so a junk number can't burn the free Gemini quota. Explicitly

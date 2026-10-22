@@ -37,7 +37,7 @@ const SUNNY_JID = PAIRING_NUMBER ? `${PAIRING_NUMBER}@s.whatsapp.net` : '';
 const REPLY_DELAY_MS = Math.max(1, parseInt(process.env.REPLY_DELAY_SECONDS || '10', 10) || 10) * 1000;
 const HISTORY_LIMIT = Math.max(1, parseInt(process.env.HISTORY_LIMIT || String(MAX_HISTORY), 10) || MAX_HISTORY);
 const HISTORY_FILE = path.join(here, 'history.json');
-const QUIET_HOURS = parseQuietHours(process.env.QUIET_HOURS ?? '23-7'); // default overnight silence; set QUIET_HOURS= (empty) to disable
+const QUIET_HOURS = parseQuietHours(process.env.QUIET_HOURS); // e.g. 23-7; unset or empty = no quiet hours
 const REPLY_CAP = Math.max(0, parseInt(process.env.MAX_REPLIES_PER_CHAT_PER_DAY || '10', 10) || 0); // per stranger per day; 0 = no cap
 const REPLY_COUNTS_FILE = path.join(here, 'reply-counts.json');
 
